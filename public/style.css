@@ -60,3 +60,7 @@ button { color: inherit; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 @media (max-width: 850px) { .deck-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }.deck-option { min-height: 145px; } }
 @media (max-width: 420px) { .deck-selection-heading h1 { font-size: 32px; }.deck-options { gap: 8px; }.deck-option { min-height: 130px; gap: 9px; }.deck-option-name { font-size: 12px; } }
+.hand-row { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; }
+.hand-faction-group { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 5px; }
+.hand-faction-group .faction-label { flex: 0 0 auto; padding-bottom: 10px; color: #a6b3a5; font-size: 8px; writing-mode: vertical-rl; }
+.hand-faction-group .faction-cards { display: flex; flex-wrap: nowrap; align-items: flex-end; gap: 9px; }
