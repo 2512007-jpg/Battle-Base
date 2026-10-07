@@ -65,7 +65,7 @@ function renderBoard(container, cards, isEnemy) {
   container.innerHTML = cards.map((card) => {
     const selected = card.instanceId === selectedAttacker;
     const canAttack = card.canAttack;
-    return `<button class="minion ${selected ? 'selected' : ''} ${!canAttack && !isEnemy ? 'cannot-act' : ''}" data-card-id="${card.instanceId}" data-enemy="${isEnemy}" title="${isEnemy ? '攻撃対象にする' : canAttack ? '攻撃する' : 'このターンは攻撃済み'}"><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="stat-row"><b class="stat">${card.attack}</b><b class="stat health">${card.currentHealth}</b></span></button>`;
+    return `<button class="minion ${selected ? 'selected' : ''} ${!canAttack && !isEnemy ? 'cannot-act' : ''}" data-card-id="${card.instanceId}" data-enemy="${isEnemy}" title="${isEnemy ? '攻撃対象にする' : canAttack ? '攻撃する' : 'このターンは攻撃済み'} · ${card.attribute}属性${card.ability ? `・${card.ability.text}` : ''}"><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="stat-row"><b class="stat">${card.attack}</b><b class="stat health">${card.currentHealth}</b></span></button>`;
   }).join('');
 }
 
@@ -94,7 +94,7 @@ function render() {
   elements['turn-label'].textContent = isMyTurn ? 'あなたのターン' : state.status === 'finished' ? '対戦終了' : '相手のターン';
   elements['turn-label'].style.color = isMyTurn ? '#d8b96b' : '#a6b3a5';
   elements['end-turn'].disabled = !isMyTurn;
-  elements['player-hand'].innerHTML = you.hand.map((card) => `<button class="hand-card ${card.kind === 'spell' ? 'spell' : ''} ${card.cost > you.mana ? 'unaffordable' : ''}" data-card-id="${card.instanceId}" title="${card.text}"><span class="card-cost">${card.cost}</span><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span>${card.kind === 'unit' ? `<span class="card-stats">${card.attack} ⚔ &nbsp; ${card.health} ♥</span>` : '<span class="card-stats">SPELL</span>'}<span class="card-text">${card.text}</span></button>`).join('');
+  elements['player-hand'].innerHTML = you.hand.map((card) => `<button class="hand-card ${card.kind === 'spell' ? 'spell' : ''} ${card.cost > you.mana ? 'unaffordable' : ''}" data-card-id="${card.instanceId}" title="${card.attribute}属性${card.ability ? `・${card.ability.text}` : ''}"><span class="card-cost">${card.cost}</span><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="card-stats">${card.kind === 'monster' ? `モンスター ${card.attack}⚔ ${card.health}♥` : 'スペル'}</span><span class="card-text">${card.attribute}属性 · ${card.ability?.text ?? '能力なし'}</span></button>`).join('');
   elements['hand-count'].textContent = you.hand.length;
   elements['hand-hint'].textContent = isMyTurn ? 'カードを選んでプレイ' : '相手の手番です';
   elements['opponent-hand'].innerHTML = Array.from({ length: enemy?.handCount ?? 0 }, () => '<span class="back-card"></span>').join('');

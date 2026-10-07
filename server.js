@@ -9,14 +9,14 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 const port = Number(process.env.PORT) || 3000;
 const rooms = new Map();
 const cardLibrary = [
-  { id: 'ember-fox', name: '火花の狐', kind: 'unit', cost: 1, attack: 2, health: 1, icon: '🦊', color: 'ember', text: '素早く駆ける小さな炎。' },
-  { id: 'moss-guardian', name: '苔むす守護者', kind: 'unit', cost: 2, attack: 1, health: 4, icon: '🪨', color: 'moss', text: '静かな森の盾となる。' },
-  { id: 'moon-archer', name: '月影の射手', kind: 'unit', cost: 2, attack: 3, health: 2, icon: '🏹', color: 'moon', text: '月光をまとい、敵を射抜く。' },
-  { id: 'rune-witch', name: 'ルーンの魔女', kind: 'unit', cost: 3, attack: 2, health: 4, icon: '🧙', color: 'violet', text: '古き文字に魔力を宿す。' },
-  { id: 'iron-stag', name: '鉄角の大鹿', kind: 'unit', cost: 4, attack: 4, health: 5, icon: '🦌', color: 'gold', text: '森の王が大地を踏み鳴らす。' },
-  { id: 'star-dragon', name: '星喰らいの竜', kind: 'unit', cost: 5, attack: 6, health: 6, icon: '🐉', color: 'ember', text: '夜空の星を喰らう古竜。' },
-  { id: 'healing-spring', name: '癒やしの泉', kind: 'spell', cost: 2, icon: '💧', color: 'moon', text: 'あなたの英雄の体力を3回復。' },
-  { id: 'meteor', name: '流星の一撃', kind: 'spell', cost: 3, icon: '☄️', color: 'ember', text: '敵の英雄に3ダメージ。' },
+  { id: 'ember-fox', name: '火花の狐', kind: 'monster', cost: 1, attack: 2, health: 1, icon: '🦊', color: 'ember', attribute: '炎', ability: { id: 'haste', name: '速攻', text: '召喚したターンに攻撃できる。' }, text: '素早く駆ける小さな炎。' },
+  { id: 'moss-guardian', name: '苔むす守護者', kind: 'monster', cost: 2, attack: 1, health: 4, icon: '🪨', color: 'moss', attribute: '森', ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '静かな森の盾となる。' },
+  { id: 'moon-archer', name: '月影の射手', kind: 'monster', cost: 2, attack: 3, health: 2, icon: '🏹', color: 'moon', attribute: '月', text: '月光をまとい、敵を射抜く。' },
+  { id: 'rune-witch', name: 'ルーンの魔女', kind: 'monster', cost: 3, attack: 2, health: 4, icon: '🧙', color: 'violet', attribute: '秘', text: '古き文字に魔力を宿す。' },
+  { id: 'iron-stag', name: '鉄角の大鹿', kind: 'monster', cost: 4, attack: 4, health: 5, icon: '🦌', color: 'gold', attribute: '森', ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '森の王が大地を踏み鳴らす。' },
+  { id: 'star-dragon', name: '星喰らいの竜', kind: 'monster', cost: 5, attack: 6, health: 6, icon: '🐉', color: 'ember', attribute: '星', text: '夜空の星を喰らう古竜。' },
+  { id: 'healing-spring', name: '癒やしの泉', kind: 'spell', cost: 2, icon: '💧', color: 'moon', attribute: '水', ability: { id: 'heal', name: '回復', text: 'あなたの英雄の体力を3回復する。' }, text: 'あなたの英雄の体力を3回復。' },
+  { id: 'meteor', name: '流星の一撃', kind: 'spell', cost: 3, icon: '☄️', color: 'ember', attribute: '炎', ability: { id: 'damage', name: '直撃', text: '敵の英雄に3ダメージを与える。' }, text: '敵の英雄に3ダメージ。' },
 ];
 
 function createDeck() {
@@ -34,8 +34,8 @@ function createPlayer(id, name) {
 }
 
 function publicCard(card) {
-  const { instanceId, id, name, kind, cost, attack, health, icon, color, text } = card;
-  return { instanceId, id, name, kind, cost, attack, health, icon, color, text };
+  const { instanceId, id, name, kind, cost, attack, health, icon, color, attribute, ability, text } = card;
+  return { instanceId, id, name, kind, cost, attack, health, icon, color, attribute, ability, text };
 }
 
 function snapshot(room, recipientId) {
@@ -103,17 +103,17 @@ function handleAction(room, player, action) {
     if (!card || card.cost > player.mana) return;
     player.mana -= card.cost;
     player.hand.splice(cardIndex, 1);
-    if (card.kind === 'unit') {
+    if (card.kind === 'monster') {
       if (player.board.length >= 5) {
         player.hand.splice(cardIndex, 0, card);
         player.mana += card.cost;
         return;
       }
-      player.board.push({ ...card, currentHealth: card.health, canAttack: false });
+      player.board.push({ ...card, currentHealth: card.health, canAttack: card.ability?.id === 'haste' });
       announce(room, `${player.name}は「${card.name}」を召喚した`);
     } else {
-      if (card.id === 'healing-spring') player.health = Math.min(20, player.health + 3);
-      if (card.id === 'meteor') {
+      if (card.ability?.id === 'heal') player.health = Math.min(20, player.health + 3);
+      if (card.ability?.id === 'damage') {
         const enemy = room.players.find((entry) => entry.id !== player.id);
         enemy.health -= 3;
       }
@@ -125,13 +125,16 @@ function handleAction(room, player, action) {
     const attacker = player.board.find((card) => card.instanceId === action.cardId);
     const enemy = room.players.find((entry) => entry.id !== player.id);
     if (!attacker?.canAttack) return;
+    const guards = enemy.board.filter((card) => card.ability?.id === 'guard');
     if (action.targetId === 'hero') {
+      if (guards.length) return;
       attacker.canAttack = false;
       enemy.health -= attacker.attack;
       room.message = `${attacker.name}が${enemy.name}を攻撃 (${attacker.attack}ダメージ)`;
     } else {
       const target = enemy.board.find((card) => card.instanceId === action.targetId);
       if (!target) return;
+      if (guards.length && target.ability?.id !== 'guard') return;
       attacker.canAttack = false;
       target.currentHealth -= attacker.attack;
       attacker.currentHealth -= target.attack;
