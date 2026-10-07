@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
-    <script src="/app.js" defer></script>
+    <script type="module" src="/app.js"></script>
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -54,6 +54,17 @@
           <div class="rules-note"><span class="rules-icon">ᚱ</span><p><strong>森の決闘について</strong><br />20の生命力を奪い合う、2人用ターン制カードバトル。</p></div>
           <div class="panel-footer"><span>FIXED DECK · 30 CARDS</span><span>VER. 1.0</span></div>
         </aside>
+      </section>
+
+      <section id="deck-selection" class="deck-selection-view hidden">
+        <div class="deck-selection-heading">
+          <p class="eyebrow"><span></span> PREPARE FOR THE DUEL</p>
+          <h1>デッキを<br /><em>選択してください。</em></h1>
+          <p class="deck-room-label">ROOM <strong id="deck-room-code">------</strong></p>
+        </div>
+        <div id="deck-options" class="deck-options" role="group" aria-label="対戦デッキ"></div>
+        <button id="confirm-deck" class="primary-button deck-confirm"><span>このデッキで対戦する</span><b>↗</b></button>
+        <button id="deck-cancel" class="quiet-button deck-cancel">ロビーに戻る</button>
       </section>
 
       <section id="waiting" class="waiting-view hidden">

@@ -4,23 +4,39 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
+import { getDeckById } from './public/deckPresets.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const port = Number(process.env.PORT) || 3000;
 const rooms = new Map();
-const cardLibrary = [
-  { id: 'ember-fox', name: '火花の狐', kind: 'monster', cost: 1, attack: 2, health: 1, icon: '🦊', color: 'ember', attribute: '炎', copies: 4, ability: { id: 'haste', name: '速攻', text: '召喚したターンに攻撃できる。' }, text: '素早く駆ける小さな炎。' },
-  { id: 'moss-guardian', name: '苔むす守護者', kind: 'monster', cost: 2, attack: 1, health: 4, icon: '🪨', color: 'moss', attribute: '森', copies: 4, ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '静かな森の盾となる。' },
-  { id: 'moon-archer', name: '月影の射手', kind: 'monster', cost: 2, attack: 3, health: 2, icon: '🏹', color: 'moon', attribute: '月', copies: 4, text: '月光をまとい、敵を射抜く。' },
-  { id: 'rune-witch', name: 'ルーンの魔女', kind: 'monster', cost: 3, attack: 2, health: 4, icon: '🧙', color: 'violet', attribute: '秘', copies: 4, text: '古き文字に魔力を宿す。' },
-  { id: 'iron-stag', name: '鉄角の大鹿', kind: 'monster', cost: 4, attack: 4, health: 5, icon: '🦌', color: 'gold', attribute: '森', copies: 4, ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '森の王が大地を踏み鳴らす。' },
-  { id: 'star-dragon', name: '星喰らいの竜', kind: 'monster', cost: 5, attack: 6, health: 6, icon: '🐉', color: 'ember', attribute: '星', copies: 4, text: '夜空の星を喰らう古竜。' },
-  { id: 'healing-spring', name: '癒やしの泉', kind: 'spell', cost: 2, icon: '💧', color: 'moon', attribute: '水', copies: 3, ability: { id: 'heal', name: '回復', text: 'あなたの英雄の体力を3回復する。' }, text: 'あなたの英雄の体力を3回復。' },
-  { id: 'meteor', name: '流星の一撃', kind: 'spell', cost: 3, icon: '☄️', color: 'ember', attribute: '炎', copies: 3, ability: { id: 'damage', name: '直撃', text: '敵の英雄に3ダメージを与える。' }, text: '敵の英雄に3ダメージ。' },
-];
+
+const elementCards = {
+  火: [
+    { id: 'flame-scout', name: '火の斥候', kind: 'monster', cost: 1, attack: 2, health: 1, icon: '🔥', color: 'fire', attribute: '火', copies: 6, ability: { id: 'haste', name: '速攻', text: '召喚したターンに攻撃できる。' }, text: '先陣を切る火の兵士。' },
+    { id: 'magma-guard', name: '溶岩守護', kind: 'monster', cost: 2, attack: 2, health: 3, icon: '🧨', color: 'fire', attribute: '火', copies: 4, ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '熱を盾に守る炎の守人。' },
+    { id: 'flare-burst', name: '火炎波', kind: 'spell', cost: 3, icon: '☄️', color: 'fire', attribute: '火', copies: 3, ability: { id: 'damage', name: '直撃', text: '敵の英雄に3ダメージを与える。' }, text: '敵の英雄に火の怒りを浴びせる。' },
+  ],
+  水: [
+    { id: 'ripple-warden', name: '波紋守', kind: 'monster', cost: 2, attack: 2, health: 2, icon: '💧', color: 'water', attribute: '水', copies: 5, ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '澄んだ水が敵の足を止める。' },
+    { id: 'tide-sage', name: '潮流賢者', kind: 'monster', cost: 3, attack: 2, health: 4, icon: '🌊', color: 'water', attribute: '水', copies: 5, ability: { id: 'heal', name: '回復', text: 'あなたの英雄の体力を3回復する。' }, text: '海の知恵で傷を癒やす。' },
+    { id: 'deep-heal', name: '深海の恵み', kind: 'spell', cost: 2, icon: '🫧', color: 'water', attribute: '水', copies: 4, ability: { id: 'heal', name: '回復', text: 'あなたの英雄の体力を3回復する。' }, text: '穏やかな水流が命を呼び戻す。' },
+  ],
+  土: [
+    { id: 'root-warden', name: '根の守り手', kind: 'monster', cost: 1, attack: 1, health: 3, icon: '🌿', color: 'earth', attribute: '土', copies: 5, ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '土の根が迷いを止める。' },
+    { id: 'stone-giant', name: '土塊の巨人', kind: 'monster', cost: 4, attack: 4, health: 5, icon: '🪨', color: 'earth', attribute: '土', copies: 6, ability: { id: 'guard', name: '守護', text: '守護がいる間、相手は他を攻撃できない。' }, text: '大地を押し固めた巨躯。' },
+    { id: 'earth-bind', name: '大地の縛り', kind: 'spell', cost: 2, icon: '⛰️', color: 'earth', attribute: '土', copies: 3, ability: { id: 'damage', name: '直撃', text: '敵の英雄に3ダメージを与える。' }, text: '足元の岩が敵を固定する。' },
+  ],
+  雷: [
+    { id: 'spark-hawk', name: '雷角の鷲', kind: 'monster', cost: 2, attack: 3, health: 2, icon: '⚡', color: 'thunder', attribute: '雷', copies: 6, ability: { id: 'haste', name: '速攻', text: '召喚したターンに攻撃できる。' }, text: '稲妻の翼で空を切り裂く。' },
+    { id: 'thunder-witch', name: '雷の巫女', kind: 'monster', cost: 3, attack: 2, health: 4, icon: '🧭', color: 'thunder', attribute: '雷', copies: 5, ability: { id: 'damage', name: '直撃', text: '敵の英雄に3ダメージを与える。' }, text: '雷の呪文を操る女神。' },
+    { id: 'storm-call', name: '雷鳴の召喚', kind: 'spell', cost: 3, icon: '🌩️', color: 'thunder', attribute: '雷', copies: 4, ability: { id: 'damage', name: '直撃', text: '敵の英雄に3ダメージを与える。' }, text: '天の怒りを地に落とす。' },
+  ],
+};
+
+const cardLibrary = Object.values(elementCards).flatMap((cards) => cards.flatMap((card) => Array.from({ length: card.copies }, () => ({ ...card }))));
 
 function createDeck() {
-  const cards = cardLibrary.flatMap((card) => Array.from({ length: card.copies }, () => ({ ...card, instanceId: randomUUID() })));
+  const cards = cardLibrary.map((card) => ({ ...card, instanceId: randomUUID() }));
   for (let index = cards.length - 1; index > 0; index -= 1) {
     const other = Math.floor(Math.random() * (index + 1));
     [cards[index], cards[other]] = [cards[other], cards[index]];
@@ -28,9 +44,18 @@ function createDeck() {
   return cards;
 }
 
-function createPlayer(id, name) {
-  const deck = createDeck();
-  return { id, name: name.slice(0, 18) || '旅人', health: 20, mana: 0, maxMana: 0, hand: deck.splice(0, 4), deck, board: [] };
+function createDeckFromPreset(deckId) {
+  const preset = getDeckById(deckId);
+  const cards = preset.cards.flatMap((cardId) => {
+    const card = cardLibrary.find((entry) => entry.id === cardId);
+    return card ? [{ ...card, instanceId: randomUUID() }] : [];
+  });
+  return cards.length ? cards : createDeck();
+}
+
+function createPlayer(id, name, deckId) {
+  const deck = createDeckFromPreset(deckId);
+  return { id, name: name.slice(0, 18) || '旅人', health: 20, mana: 0, maxMana: 0, hand: deck.splice(0, 4), deck, board: [], ready: false };
 }
 
 function publicCard(card) {
@@ -193,11 +218,21 @@ webSockets.on('connection', (socket) => {
         room = { id: roomId, status: 'waiting', turn: 0, winner: null, message: '対戦相手を待っています…', players: [], connections: new Map() };
         rooms.set(roomId, room);
       }
-      player = createPlayer(randomUUID(), String(data.name || '旅人'));
+      player = createPlayer(randomUUID(), String(data.name || '旅人'), 'blaze-ritual');
       room.players.push(player);
       room.connections.set(player.id, socket);
       socket.send(JSON.stringify({ type: 'joined', playerId: player.id, roomId: room.id }));
-      if (room.players.length === 2) startGame(room);
+      broadcast(room);
+      return;
+    }
+    if (room && player && data.type === 'selectDeck' && room.status === 'waiting' && !player.ready) {
+      const selectedDeckId = getDeckById(String(data.deckId || 'blaze-ritual')).id;
+      const deck = createDeckFromPreset(selectedDeckId);
+      player.hand = deck.splice(0, 4);
+      player.deck = deck;
+      player.ready = true;
+      socket.send(JSON.stringify({ type: 'deckSelected' }));
+      if (room.players.length === 2 && room.players.every((entry) => entry.ready)) startGame(room);
       broadcast(room);
       return;
     }
@@ -208,7 +243,7 @@ webSockets.on('connection', (socket) => {
     room.connections.delete(player.id);
     if (room.status === 'waiting') {
       room.players = room.players.filter((entry) => entry.id !== player.id);
-      rooms.delete(room.id);
+      if (room.players.length === 0) rooms.delete(room.id);
       return;
     }
     if (room.status === 'playing') {

@@ -1,5 +1,8 @@
+import { groupCardsByFaction } from './cardGrouping.js';
+import { deckPresets } from './deckPresets.js';
+
 const elements = Object.fromEntries([
-  'connection', 'lobby', 'waiting', 'game', 'player-name', 'create-room', 'room-code', 'join-room', 'lobby-error', 'waiting-code', 'copy-code', 'copy-hint', 'cancel-room', 'game-room', 'turn-label', 'leave-game', 'opponent-name', 'opponent-health', 'opponent-mana', 'opponent-deck', 'opponent-hand', 'opponent-board', 'battle-message', 'player-name-display', 'player-health', 'player-mana', 'player-deck', 'player-board', 'player-hand', 'hand-count', 'hand-hint', 'end-turn', 'game-result', 'result-kicker', 'result-title', 'play-again',
+  'connection', 'lobby', 'deck-selection', 'deck-room-code', 'deck-options', 'confirm-deck', 'deck-cancel', 'waiting', 'game', 'player-name', 'create-room', 'room-code', 'join-room', 'lobby-error', 'waiting-code', 'copy-code', 'copy-hint', 'cancel-room', 'game-room', 'turn-label', 'leave-game', 'opponent-name', 'opponent-health', 'opponent-mana', 'opponent-deck', 'opponent-hand', 'opponent-board', 'battle-message', 'player-name-display', 'player-health', 'player-mana', 'player-deck', 'player-board', 'player-hand', 'hand-count', 'hand-hint', 'end-turn', 'game-result', 'result-kicker', 'result-title', 'play-again',
 ].map((id) => [id, document.getElementById(id)]));
 
 let socket;
@@ -8,6 +11,8 @@ let roomId;
 let state;
 let selectedAttacker;
 let playerName = '';
+let selectedDeckId = 'blaze-ritual';
+let deckChosen = false;
 
 function setConnection(connected, text) {
   elements.connection.classList.toggle('offline', !connected);
@@ -15,7 +20,17 @@ function setConnection(connected, text) {
 }
 
 function showView(name) {
-  for (const view of ['lobby', 'waiting', 'game']) elements[view].classList.toggle('hidden', view !== name);
+  for (const view of ['lobby', 'deck-selection', 'waiting', 'game']) elements[view].classList.toggle('hidden', view !== name);
+}
+
+function populateDeckOptions() {
+  elements['deck-options'].innerHTML = deckPresets.map((deck) => `
+    <button class="deck-option ${deck.id === selectedDeckId ? 'selected' : ''}" type="button" data-deck-id="${deck.id}" aria-pressed="${deck.id === selectedDeckId}">
+      <span class="deck-option-mark">${deck.name.slice(0, 1)}</span>
+      <span class="deck-option-name">${deck.name}</span>
+      <span class="deck-option-count">${deck.cards.length} CARDS</span>
+    </button>
+  `).join('');
 }
 
 function connect(joinRoomId) {
@@ -39,11 +54,22 @@ function connect(joinRoomId) {
     if (message.type === 'joined') {
       playerId = message.playerId;
       roomId = message.roomId;
+      deckChosen = false;
+      selectedDeckId = 'blaze-ritual';
+      populateDeckOptions();
+      elements['deck-room-code'].textContent = roomId;
+      showView('deck-selection');
       elements['waiting-code'].textContent = roomId;
       elements['game-room'].textContent = `ROOM ${roomId}`;
     }
+    if (message.type === 'deckSelected') {
+      deckChosen = true;
+      elements['confirm-deck'].disabled = false;
+      render();
+    }
     if (message.type === 'state') {
       state = message;
+      if (!deckChosen) return;
       render();
     }
   });
@@ -62,11 +88,19 @@ function send(type, values = {}) {
 }
 
 function renderBoard(container, cards, isEnemy) {
-  container.innerHTML = cards.map((card) => {
-    const selected = card.instanceId === selectedAttacker;
-    const canAttack = card.canAttack;
-    return `<button class="minion ${selected ? 'selected' : ''} ${!canAttack && !isEnemy ? 'cannot-act' : ''}" data-card-id="${card.instanceId}" data-enemy="${isEnemy}" title="${isEnemy ? '攻撃対象にする' : canAttack ? '攻撃する' : 'このターンは攻撃済み'} · ${card.attribute}属性${card.ability ? `・${card.ability.text}` : ''}"><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="stat-row"><b class="stat">${card.attack}</b><b class="stat health">${card.currentHealth}</b></span></button>`;
-  }).join('');
+  const groupedCards = groupCardsByFaction(cards);
+  container.innerHTML = groupedCards.map(({ name, cards: factionCards }) => `
+    <div class="faction-group ${isEnemy ? 'enemy-faction-group' : 'player-faction-group'}">
+      <div class="faction-label">${name}属性</div>
+      <div class="faction-cards">
+        ${factionCards.map((card) => {
+          const selected = card.instanceId === selectedAttacker;
+          const canAttack = card.canAttack;
+          return `<button class="minion ${selected ? 'selected' : ''} ${!canAttack && !isEnemy ? 'cannot-act' : ''}" data-card-id="${card.instanceId}" data-enemy="${isEnemy}" title="${isEnemy ? '攻撃対象にする' : canAttack ? '攻撃する' : 'このターンは攻撃済み'} · ${card.attribute}属性${card.ability ? `・${card.ability.text}` : ''}"><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="stat-row"><b class="stat">${card.attack}</b><b class="stat health">${card.currentHealth}</b></span></button>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
 function render() {
@@ -94,7 +128,15 @@ function render() {
   elements['turn-label'].textContent = isMyTurn ? 'あなたのターン' : state.status === 'finished' ? '対戦終了' : '相手のターン';
   elements['turn-label'].style.color = isMyTurn ? '#d8b96b' : '#a6b3a5';
   elements['end-turn'].disabled = !isMyTurn;
-  elements['player-hand'].innerHTML = you.hand.map((card) => `<button class="hand-card ${card.kind === 'spell' ? 'spell' : ''} ${card.cost > you.mana ? 'unaffordable' : ''}" data-card-id="${card.instanceId}" title="${card.attribute}属性${card.ability ? `・${card.ability.text}` : ''}"><span class="card-cost">${card.cost}</span><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="card-stats">${card.kind === 'monster' ? `モンスター ${card.attack}⚔ ${card.health}♥` : 'スペル'}</span><span class="card-text">${card.attribute}属性 · ${card.ability?.text ?? '能力なし'}</span></button>`).join('');
+  const groupedHand = groupCardsByFaction(you.hand);
+  elements['player-hand'].innerHTML = groupedHand.map(({ name, cards: factionCards }) => `
+    <div class="faction-group hand-faction-group">
+      <div class="faction-label">${name}属性</div>
+      <div class="faction-cards">
+        ${factionCards.map((card) => `<button class="hand-card ${card.kind === 'spell' ? 'spell' : ''} ${card.cost > you.mana ? 'unaffordable' : ''}" data-card-id="${card.instanceId}" title="${card.attribute}属性${card.ability ? `・${card.ability.text}` : ''}"><span class="card-cost">${card.cost}</span><span class="card-icon">${card.icon}</span><span class="card-name">${card.name}</span><span class="card-stats">${card.kind === 'monster' ? `モンスター ${card.attack}⚔ ${card.health}♥` : 'スペル'}</span><span class="card-text">${card.attribute}属性 · ${card.ability?.text ?? '能力なし'}</span></button>`).join('')}
+      </div>
+    </div>
+  `).join('');
   elements['hand-count'].textContent = you.hand.length;
   elements['hand-hint'].textContent = isMyTurn ? 'カードを選んでプレイ' : '相手の手番です';
   elements['opponent-hand'].innerHTML = Array.from({ length: enemy?.handCount ?? 0 }, () => '<span class="back-card"></span>').join('');
@@ -111,6 +153,27 @@ function render() {
 }
 
 elements['create-room'].addEventListener('click', () => connect(''));
+elements['deck-options'].addEventListener('click', (event) => {
+  const option = event.target.closest('[data-deck-id]');
+  if (!option || deckChosen) return;
+  selectedDeckId = option.dataset.deckId;
+  for (const button of elements['deck-options'].querySelectorAll('[data-deck-id]')) {
+    const selected = button.dataset.deckId === selectedDeckId;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  }
+});
+elements['confirm-deck'].addEventListener('click', () => {
+  elements['confirm-deck'].disabled = true;
+  send('selectDeck', { deckId: selectedDeckId });
+});
+function returnToLobby() {
+  socket?.close();
+  state = null;
+  deckChosen = false;
+  showView('lobby');
+}
+elements['deck-cancel'].addEventListener('click', returnToLobby);
 elements['join-room'].addEventListener('click', () => {
   const code = elements['room-code'].value.trim().toUpperCase();
   if (!code) {
@@ -129,7 +192,7 @@ elements['copy-code'].addEventListener('click', async () => {
     elements['copy-hint'].textContent = `ルームコード: ${roomId}`;
   }
 });
-elements['cancel-room'].addEventListener('click', () => { socket?.close(); state = null; showView('lobby'); });
+elements['cancel-room'].addEventListener('click', returnToLobby);
 elements['leave-game'].addEventListener('click', () => { socket?.close(); state = null; selectedAttacker = null; showView('lobby'); });
 elements['play-again'].addEventListener('click', () => { socket?.close(); state = null; selectedAttacker = null; showView('lobby'); });
 elements['end-turn'].addEventListener('click', () => send('endTurn'));
@@ -157,5 +220,6 @@ elements['enemy-hero-target'].addEventListener('click', () => {
   selectedAttacker = null;
 });
 
+populateDeckOptions();
 showView('lobby');
 setConnection(false, '未接続');
